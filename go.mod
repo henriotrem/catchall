@@ -10,6 +10,7 @@ require (
 	github.com/tidwall/tinybtree v1.1.0 // indirect
 	github.com/tidwall/uhaha v0.8.1 // indirect
 	github.com/tidwall/uhatools v0.4.1 // indirect
+	github.com/tsliwowicz/go-wrk v0.0.0-20210628064207-cc6865c14ec7 // indirect
 	github.com/urfave/cli v1.22.5 // indirect
 	go.mongodb.org/mongo-driver v1.7.2 // indirect
 )
