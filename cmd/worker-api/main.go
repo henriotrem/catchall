@@ -22,15 +22,15 @@ func main() {
 	}
 
 	fmt.Println("\n# Starting 'CatchAll - Worker Web Server' application")
-	fmt.Println("* Application try connection to the database cluster", os.Args[2])
+	fmt.Println("* Application try connection to the database cluster", os.Args[1])
 
-	if cl, err = connectDBCluster(strings.Split(os.Args[2], ",")); err != nil {
+	if cl, err = connectDBCluster(strings.Split(os.Args[1], ",")); err != nil {
 		return
 	}
 	defer cl.Close()
 
-	fmt.Println("* Application starts the web server on port", os.Args[1])
-	startWebServer(os.Args[1])
+	fmt.Println("* Application starts the web server on port", os.Args[2])
+	startWebServer(os.Args[2])
 }
 
 // Connect DB Cluster - Connect the master to an in-memory fault tolerant worker database
