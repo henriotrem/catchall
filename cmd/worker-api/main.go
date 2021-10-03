@@ -33,6 +33,7 @@ func main() {
 	startWebServer(os.Args[1])
 }
 
+// Connect DB Cluster - Connect the master to an in-memory fault tolerant worker database
 func connectDBCluster(servers []string) (*uhatools.Cluster, error) {
 
 	cl := uhatools.OpenCluster(uhatools.ClusterOptions{
@@ -49,6 +50,7 @@ func connectDBCluster(servers []string) (*uhatools.Cluster, error) {
 	return cl, nil
 }
 
+// Ping DB Cluster - To verify connectivity
 func pingDBCluster(cl *uhatools.Cluster) error {
 
 	conn := cl.Get()
@@ -62,6 +64,7 @@ func pingDBCluster(cl *uhatools.Cluster) error {
 	return nil
 }
 
+// Start Web Server - Expose the in-memory fault tolerant worker database to http calls
 func startWebServer(port string) {
 
 	router := mux.NewRouter().StrictSlash(true)

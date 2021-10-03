@@ -79,6 +79,8 @@ func startWebServer(port string) {
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
+// Get Domain - Controller to get the domain
+// TODO - Add validation, authorization of the request and manage potential issues
 func getDomain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -92,6 +94,8 @@ func getDomain(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(d)
 }
+
+// Get - Retrieve domain from the database
 func (domain *domain) get(name string) error {
 	var ctx context.Context
 

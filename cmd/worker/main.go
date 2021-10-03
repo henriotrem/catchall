@@ -54,6 +54,8 @@ func previousEpoch(current string) string {
 	return strconv.FormatInt(epoch-1, 32)
 }
 
+// Get Period
+// Create a period tree if doesn't exist and return the period
 func (db *database) getPeriod(epoch string, create bool) *tinybtree.BTree {
 	v, _ := db.periods.Get(epoch)
 	if v != nil {
