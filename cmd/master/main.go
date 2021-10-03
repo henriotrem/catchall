@@ -11,6 +11,7 @@ import (
 	"github.com/tidwall/tinybtree"
 	"github.com/tidwall/uhatools"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -20,6 +21,8 @@ type domain struct {
 	delivered int64
 	bounced   int64
 }
+
+type domains []domain
 
 func getEpoch(now time.Time) string {
 	return strconv.FormatInt(now.Unix()/30, 32)
@@ -124,13 +127,51 @@ func pingDBCluster(cl *uhatools.Cluster) error {
 func runJobs(database *mongo.Database, workers []*uhatools.Cluster) {
 
 	for {
-		epoch := previousEpoch(getEpoch(time.Now()))
-		_, err := aggregatePeriod(workers, epoch)
-		if err != nil {
-			return
-		}
+		go func() {
+			epoch := previousEpoch(getEpoch(time.Now()))
+			period, err := aggregatePeriod(workers, epoch)
+			if err != nil || period.Len() == 0 {
+				return
+			}
+			err = updateDomains(database, period)
+			if err != nil {
+				return
+			}
+		}()
 		time.Sleep(30 * time.Second)
 	}
+}
+
+// Update Domains - Update the domains in the database using bulk write
+func updateDomains(database *mongo.Database, period *tinybtree.BTree) error {
+
+	var operations []mongo.WriteModel
+	var count int
+
+	bulkOption := options.BulkWriteOptions{}
+	bulkOption.SetOrdered(true)
+
+	period.Scan(func(name string, v interface{}) bool {
+		d := v.(*domain)
+
+		operation := mongo.NewUpdateOneModel()
+		operation.SetFilter(bson.M{"name": d.name})
+		operation.SetUpdate(bson.M{"$inc": bson.M{"delivered": d.delivered, "bounced": d.bounced}})
+		operation.SetUpsert(true)
+		operations = append(operations, operation)
+
+		count++
+
+		return true
+	})
+
+	_, err := database.Collection("domains").BulkWrite(context.TODO(), operations, &bulkOption)
+	if err != nil {
+		return err
+	}
+	fmt.Println("* Domains upserted in the database :", count)
+
+	return nil
 }
 
 // Aggregate Period - Create a single period from different clusters

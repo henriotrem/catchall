@@ -20,8 +20,8 @@ const (
 
 func main() {
 
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Specify the type of benchkmark you want to perform [http,redis]")
+	if len(os.Args) < 4 {
+		fmt.Fprintf(os.Stderr, "Specify the type of benchkmark you want to perform [redis,http] [nClusters] [nThreads]")
 		os.Exit(1)
 	}
 	if os.Args[1] != MODE_HTTP && os.Args[1] != MODE_REDIS {
@@ -30,8 +30,10 @@ func main() {
 	}
 	fmt.Println("\n# Starting 'CatchAll - Benchmark' application")
 	fmt.Println("* Application starting the benchmark using", os.Args[1])
+	fmt.Println("* Clusters tested", os.Args[2])
 
-	nThreads := 1
+	nClusters, _ := strconv.Atoi(os.Args[2])
+	nThreads, _ := strconv.Atoi(os.Args[3])
 	wg := &sync.WaitGroup{}
 	bus := catchall.SpawnEventPool()
 	defer bus.Close()
@@ -39,16 +41,16 @@ func main() {
 	for i := 0; i < nThreads; i++ {
 		wg.Add(1)
 		if os.Args[1] == MODE_HTTP {
-			go mailgunHttp(i, nThreads, bus, wg)
+			go mailgunHttp(i, nClusters, nThreads, bus, wg)
 		} else if os.Args[1] == MODE_REDIS {
-			go mailgunRedis(i, nThreads, bus, wg)
+			go mailgunRedis(i, nClusters, nThreads, bus, wg)
 		}
 	}
 
 	wg.Wait()
 }
 
-func mailgunHttp(idx int, nThreads int, bus catchall.EventPool, wg *sync.WaitGroup) {
+func mailgunHttp(idx int, nClusters int, nThreads int, bus catchall.EventPool, wg *sync.WaitGroup) {
 
 	client := &http.Client{}
 
@@ -57,7 +59,7 @@ func mailgunHttp(idx int, nThreads int, bus catchall.EventPool, wg *sync.WaitGro
 	for i := 1; i <= 500_000; i++ {
 		event := bus.GetEvent()
 
-		url := "http://127.0.0.1:2200" + strconv.Itoa(i%3+1) + "/events/" + event.Domain + "/" + event.Type
+		url := "http://127.0.0.1:2200" + strconv.Itoa(i%nClusters+1) + "/events/" + event.Domain + "/" + event.Type
 		req, err := http.NewRequest(http.MethodPut, url, nil)
 		if err != nil {
 			log.Fatalf("Wrong URL: %v\n", err)
@@ -78,7 +80,7 @@ func mailgunHttp(idx int, nThreads int, bus catchall.EventPool, wg *sync.WaitGro
 	wg.Done()
 }
 
-func mailgunRedis(idx int, nThreads int, bus catchall.EventPool, wg *sync.WaitGroup) {
+func mailgunRedis(idx int, nClusters int, nThreads int, bus catchall.EventPool, wg *sync.WaitGroup) {
 
 	c, err := redis.Dial("tcp", ":11001")
 	if err != nil {

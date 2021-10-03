@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+
+	"github.com/gorilla/mux"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -11,71 +16,95 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Book struct {
-	ID    primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	Isbn  string             `json:"isbn,omitempty" bson:"isbn,omitempty"`
-	Title string             `json:"title,omitempty" bson:"title,omitempty"`
+var database *mongo.Database
+
+type domain struct {
+	ID        primitive.ObjectID `json:"-"      bson:"_id,omitempty"`
+	Name      string             `json:"-"      bson:"name"`
+	Delivered int                `json:"-"      bson:"delivered"`
+	Bounced   int                `json:"-"      bson:"bounced"`
+	Status    string             `json:"status" bson:"-"`
 }
 
-var database = connectDB()
+const (
+	UNKNOWN_STATUS     = "Unknown"
+	CATCHALL_STATUS    = "CatchAll"
+	NONCATCHALL_STATUS = "NonCatchAll"
+)
 
 func main() {
 
-	createBook()
-	getBooks()
-}
-
-func createBook() {
-
-	var book = Book{
-		Isbn:  "Isbn 1",
-		Title: "Titre 1",
+	var err error
+	if len(os.Args) < 3 {
+		fmt.Fprintf(os.Stderr, "Specify the address of database cluster servers")
+		os.Exit(1)
 	}
 
-	result, err := database.Collection("books").InsertOne(context.TODO(), book)
+	fmt.Println("\n# Starting 'CatchAll - Master Web Server' application")
+	fmt.Println("* Application try connection to the master database", os.Args[2])
 
+	database, err = connectDB(os.Args[2])
 	if err != nil {
-		log.Fatal(err.Error())
+		return
 	}
 
-	fmt.Println("Insert : ", result)
+	fmt.Println("* Application starts the web server on port", os.Args[1])
+	startWebServer(os.Args[1])
 }
 
-func getBooks() {
+// Connect DB - Connect the master to an in-memory fault tolerant worker database
+func connectDB(address string) (*mongo.Database, error) {
 
-	filter := bson.M{}
-
-	cur, err := database.Collection("books").Find(context.TODO(), filter)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	defer cur.Close(context.TODO())
-
-	for cur.Next(context.TODO()) {
-		var book Book
-
-		if err = cur.Decode(&book); err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Println("Book : ", book)
-	}
-}
-
-func connectDB() *mongo.Database {
-
-	clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017")
-
+	clientOptions := options.Client().ApplyURI("mongodb://" + address)
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	fmt.Println("Connected to database!")
+	fmt.Println("* Connected to the master DB")
 
-	database := client.Database("go_rest_api")
+	db := client.Database("catchall")
 
-	return database
+	return db, nil
+}
+
+// Start Web Server - Expose the master database to http calls
+func startWebServer(port string) {
+
+	router := mux.NewRouter().StrictSlash(true)
+
+	router.HandleFunc("/domains/{name}", getDomain).Methods("GET")
+
+	log.Fatal(http.ListenAndServe(":"+port, router))
+}
+
+func getDomain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var params = mux.Vars(r)
+	d := &domain{}
+
+	err := d.get(params["name"])
+	if err != nil {
+		w.WriteHeader(404)
+	}
+
+	json.NewEncoder(w).Encode(d)
+}
+func (domain *domain) get(name string) error {
+	var ctx context.Context
+
+	query := bson.M{"name": name}
+	err := database.Collection("domains").FindOne(ctx, query).Decode(&domain)
+
+	if domain.Bounced > 0 {
+		domain.Status = NONCATCHALL_STATUS
+	} else if domain.Delivered < 1000 {
+		domain.Status = UNKNOWN_STATUS
+	} else {
+		domain.Status = CATCHALL_STATUS
+	}
+
+	return err
 }
