@@ -20,12 +20,11 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("\n# Starting 'CatchAll - Benchmark' application")
-	fmt.Println("* Web servers called : ", os.Args[1])
+	fmt.Println("* Web servers called : ", os.Args[3])
 
-	endpoints := strings.Split(os.Args[1], ",")
-
+	tCalls, _ := strconv.Atoi(os.Args[1])
 	nThreads, _ := strconv.Atoi(os.Args[2])
-	tCalls, _ := strconv.Atoi(os.Args[3])
+	endpoints := strings.Split(os.Args[3], ",")
 
 	bus := catchall.SpawnEventPool()
 	defer bus.Close()
